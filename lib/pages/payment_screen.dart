@@ -1,3 +1,4 @@
+import 'package:coffee_app/services/email_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_credit_card/flutter_credit_card.dart';
 
@@ -56,7 +57,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                       ),
                                     );
                                     Navigator.pop(context);
-                                    // Navigator.pop(context, true);
+                                    // sendOrderEmail(email, order, total)
 
                                 }
                                 else{
