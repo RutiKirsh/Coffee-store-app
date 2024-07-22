@@ -1,4 +1,5 @@
 import 'package:coffee_app/pages/coffee_manager.dart';
+import 'package:coffee_app/pages/login_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../const.dart';
@@ -81,6 +82,7 @@ class MyDrawer extends StatelessWidget {
           GestureDetector(
             onTap: () {
               Navigator.pop(context);
+              Navigator.push(context, MaterialPageRoute(builder: (context)=> LoginScreen()));
             },
             child: Padding(
               padding: EdgeInsets.only(left: 25, bottom: 25),

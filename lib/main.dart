@@ -7,7 +7,8 @@ import 'package:provider/provider.dart';
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(/*options: DefaultFirebaseOptions.currentPlatform*/);
+  //לcollection פוקציה לדחיפת כל הנתונים בפעם הראשונה 
   // await CoffeeShop.addCoffeeToFirebase();
   runApp(MyApp());
 }

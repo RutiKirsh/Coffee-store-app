@@ -1,7 +1,12 @@
+import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:coffee_app/componants/my_button.dart';
 import 'package:coffee_app/componants/my_text_feild.dart';
 import 'package:coffee_app/services/email_service.dart';
 import 'package:coffee_app/services/user_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:google_nav_bar/google_nav_bar.dart';
@@ -14,17 +19,16 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
   int _selectedIndex = 0;
-  bool flag = false;
+  bool _isCodeSent = false;
   final List options = ['Email', 'Phone'];
   TextEditingController _emailUser = TextEditingController();
   TextEditingController _phoneUser = TextEditingController(text: '+972-');
   TextEditingController _code = TextEditingController();
+  String? _verificationid;
   late TextEditingController controller;
 
-
-  String code = '123456';
+  String code = '';
   FocusNode _focusNode = FocusNode();
   final UserService userService = UserService();
 
@@ -33,9 +37,96 @@ class _LoginScreenState extends State<LoginScreen> {
       _selectedIndex = index;
     });
   }
-String generateCode(){
-    return (100000 + (999999 - 100000) * (new DateTime.now().millisecondsSinceEpoch % 1000)).toString(); 
+
+  String generateCode() {
+    String code = '';
+    for (int i = 0; i < 6; i++) {
+      code += (0 + (Random().nextInt(9))).toString();
+    }
+    return code;
   }
+
+  void _signInSMSCode() async {
+    if (_verificationid != null) {
+      final credential = PhoneAuthProvider.credential(
+          verificationId: _verificationid!, smsCode: _code.text);
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      _checkIfNewUser();
+    }
+  }
+
+  void _verifyPhoneNumber() async {
+    String phoneNumber = _phoneUser.text.trim();
+    if (!phoneNumber.startsWith('+')) {
+      phoneNumber = '+972' + phoneNumber;
+    }
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        _checkIfNewUser();
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        print('Vari failed: ${e.message}');
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationid = verificationId;
+          _isCodeSent = true;
+        });
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {},
+    );
+  }
+
+  void _sendVerificationEmail() async {
+    String email = _emailUser.text.trim();
+    if (email.isEmpty ||
+        !RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$").hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Please enter a valid email address.'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  void _checkIfNewUser() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      QuerySnapshot userDocs = await FirebaseFirestore.instance
+          .collection('Users')
+          .where('email', isEqualTo: _emailUser.text.trim())
+          .get();
+      if (userDocs.docs.isEmpty) {
+        registerNewUser();
+      } else {
+        _navigateToHome();
+      }
+    }
+  }
+
+  void registerNewUser() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance.collection('Users').doc(user.uid).set({
+        'name': _emailUser.text.trim(),
+        'phone': _phoneUser.text.trim(),
+        'email': _emailUser.text.trim(),
+      });
+      _navigateToHome();
+    }
+  }
+
+  void _navigateToHome() {
+    Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (context) => HomeScreen(
+                  email: _emailUser.text.trim(),
+                )));
+  }
+
   bool verify() {
     return _code.text == code;
   }
@@ -63,7 +154,8 @@ String generateCode(){
       SizedBox(
         height: 15,
       ),
-      flag
+      options[0]=='Email'?
+      _isCodeSent
           ? Center(
               child: Text(
                 'We sent you a verification code, to your email: ${controller.text}',
@@ -71,11 +163,11 @@ String generateCode(){
             )
           : GestureDetector(
               onTap: () {
-                // code = generateCode();
-                code = '123456';
+                code = generateCode();
+                // code = '123456';
                 sendVerificationCode(controller.text, code);
                 setState(() {
-                  flag = true;
+                  _isCodeSent = true;
                 });
               },
               child: Container(
@@ -95,7 +187,41 @@ String generateCode(){
                       fontSize: 18),
                 ),
               ),
-            ),
+            ): 
+            _isCodeSent
+          ? Center(
+              child: Text(
+                'We sent you a verification code, to your phone: ${controller.text}',
+              ),
+            )
+          : GestureDetector(
+              onTap: () {
+                code = generateCode();
+                _verifyPhoneNumber();
+                // code = '123456';
+                sendVerificationCode(controller.text, code);
+                setState(() {
+                  _isCodeSent = true;
+                });
+              },
+              child: Container(
+                padding: EdgeInsets.all(25),
+                margin: EdgeInsets.symmetric(horizontal: 25),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.brown[700],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18),
+                ),
+              ),
+            )
     ]);
   }
 
@@ -155,7 +281,7 @@ String generateCode(){
             SizedBox(
               height: 10,
             ),
-            flag
+            _isCodeSent
                 ? Column(children: [
                     MyTextField(
                       controller: _code,
@@ -169,12 +295,15 @@ String generateCode(){
                     GestureDetector(
                       onTap: () {
                         verify()
-                            ?{ Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => HomeScreen(email: _emailUser.text))),
-                                    userService.addUser(controller.text)
-                            }: ScaffoldMessenger.of(context).showSnackBar(
+                            ? {
+                                Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) => HomeScreen(
+                                            email: _emailUser.text))),
+                                userService.addUser(controller.text)
+                              }
+                            : ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text('Invalid code')));
                       },
                       child: Container(
