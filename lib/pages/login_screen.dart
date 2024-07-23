@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
       SizedBox(
         height: 15,
       ),
-      options[0]=='Email'?
+      _selectedIndex =='Email'?
       _isCodeSent
           ? Center(
               child: Text(
